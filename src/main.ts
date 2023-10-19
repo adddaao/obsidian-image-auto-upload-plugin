@@ -136,7 +136,7 @@ export default class imageAutoUploadPlugin extends Plugin {
               const markdownUrl = markdownMatch[1];
               if (
                 this.settings.uploadedImages.find(
-                  (item: { imgUrl: string }) => item.imgUrl === markdownUrl
+                  (item: { imgUrl: string }) => item.imgUrl?.split(',')[0] === markdownUrl
                 )
               ) {
                 this.addMenu(menu, markdownUrl, editor);
@@ -156,7 +156,7 @@ export default class imageAutoUploadPlugin extends Plugin {
         .onClick(async () => {
           try {
             const selectedItem = this.settings.uploadedImages.find(
-              (item: { imgUrl: string }) => item.imgUrl === imgPath
+              (item: { imgUrl: string }) => item.imgUrl?.split(',')[0] === imgPath
             );
             if (selectedItem) {
               const res = await this.picGoDeleter.deleteImage([selectedItem]);
@@ -168,7 +168,7 @@ export default class imageAutoUploadPlugin extends Plugin {
                 }
                 this.settings.uploadedImages =
                   this.settings.uploadedImages.filter(
-                    (item: { imgUrl: string }) => item.imgUrl !== imgPath
+                    (item: { imgUrl: string }) => item.imgUrl?.split(',')[0] !== imgPath
                   );
                 this.saveSettings();
               } else {
