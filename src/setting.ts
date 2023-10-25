@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import imageAutoUploadPlugin from "./main";
 import { t } from "./lang/helpers";
 import { getOS } from "./utils";
@@ -16,6 +16,7 @@ export interface PluginSettings {
   applyImage: boolean;
   deleteSource: boolean;
   imageDesc: "origin" | "none" | "removeDefault";
+  remoteServerMode: boolean;
   [propName: string]: any;
 }
 
@@ -32,6 +33,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   newWorkBlackDomains: "",
   deleteSource: false,
   imageDesc: "origin",
+  remoteServerMode: false,
 };
 
 export class SettingTab extends PluginSettingTab {
@@ -108,6 +110,22 @@ export class SettingTab extends PluginSettingTab {
         );
     }
 
+    new Setting(containerEl)
+      .setName(t("Remote server mode"))
+      .setDesc(t("Remote server mode desc"))
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.remoteServerMode)
+          .onChange(async value => {
+            this.plugin.settings.remoteServerMode = value;
+            if (value) {
+              this.plugin.settings.workOnNetWork = false;
+            }
+            this.display();
+            await this.plugin.saveSettings();
+          })
+      );
+
     if (this.plugin.settings.uploader === "PicGo-Core") {
       new Setting(containerEl)
         .setName(t("PicGo-Core path"))
@@ -176,7 +194,12 @@ export class SettingTab extends PluginSettingTab {
         toggle
           .setValue(this.plugin.settings.workOnNetWork)
           .onChange(async value => {
-            this.plugin.settings.workOnNetWork = value;
+            if (this.plugin.settings.remoteServerMode) {
+              new Notice("Can only work when remote server mode is off.");
+              this.plugin.settings.workOnNetWork = false;
+            } else {
+              this.plugin.settings.workOnNetWork = value;
+            }
             this.display();
             await this.plugin.saveSettings();
           })

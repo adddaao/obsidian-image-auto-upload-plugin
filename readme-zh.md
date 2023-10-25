@@ -25,7 +25,7 @@
 支持黏贴剪切板的图片的时候直接上传，目前支持复制系统内图像直接上传。
 支持通过设置 `frontmatter` 来控制单个文件的上传，默认值为 `true`，控制关闭请将该值设置为 `false`
 
-支持 ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff"
+支持 ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff", ".webp", ".avif"
 
 该功能在 PicGo 2.3.0-beta7 版本中无法使用，请更换其他版本
 
@@ -57,13 +57,22 @@ image-auto-upload: true
 
 ## 支持拖拽上传
 
-仅在使用 picGo 客户端时生效
+仅在使用 picGo 或 picList 客户端时生效
 
 ## 支持 Picgo-Core
 
 目前已经全功能支持
 
 ~~目前只支持粘贴时上传图片~~
+
+## 支持 server 远程模式
+
+你可以将 [PicList](https://github.com/Kuingsmile/PicList/releases) 或 [PicList-Core](https://github.com/Kuingsmile/PicList-Core) 部署在服务器上并启用 server 模式来实现图片上传
+
+[PicList](https://github.com/Kuingsmile/PicList/releases) 2.6.3 及以上 或 [PicList-Core](https://github.com/Kuingsmile/PicList-Core)1.3.0 以上版本支持
+
+在该模式下不支持上传网络图片选项
+如果粘贴时上传图片失败，你也可以尝试启用该模式
 
 ### 安装
 

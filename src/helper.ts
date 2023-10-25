@@ -98,7 +98,6 @@ export default class Helper {
         source: source,
       });
     }
-    console.log(fileArray);
 
     return fileArray;
   }

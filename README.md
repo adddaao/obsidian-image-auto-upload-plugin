@@ -32,7 +32,7 @@ When you paste image to obsidian, this plugin will auto upload you image.
 
 You can set `image-auto-upload: false` in `frontmatter` to control one file.
 
-support ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff"
+support ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff", ".webp", ".avif"
 
 Because of the [bug](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/2) in PicGo 2.3.0-beta7, you can not use this feature. you can install other PicGo version.
 
@@ -55,6 +55,18 @@ press `ctrl+P` and input `download all images`，enter, then will auto download 
 Now you can upload image by contextMenu in edit mode.
 
 ## Support drag-and-drop
+
+Only work for picgo or picList app.
+
+## server mode
+
+You can deploy [PicList](https://github.com/Kuingsmile/PicList/releases) or [PicList-Core](https://github.com/Kuingsmile/PicList-Core) in your server and upload to it.
+
+Support [PicList](https://github.com/Kuingsmile/PicList/releases) 2.6.3 later or [PicList-Core](https://github.com/Kuingsmile/PicList-Core)1.3.0 later
+
+You can not upload network in this mode.
+如果无法粘贴时上传图片，你也可以尝试启用该模式
+If you upload fail when you paste img, you can alse try to enable the mode.
 
 ## Support picgo-core
 

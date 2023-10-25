@@ -156,3 +156,6 @@ fix [issue42](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issu
 # 3.6.1
 
 1. 批量上传与下载后验证前后文件路径是否相同，防止覆盖 [[#108]](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/108)
+
+# 3.7.0
+1. support server mode 

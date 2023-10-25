@@ -1,11 +1,13 @@
+import { readFile } from "fs";
+import { fetch, FormData } from "node-fetch-native";
+
 import { PluginSettings } from "./setting";
-import { streamToString, getLastImage } from "./utils";
+import { streamToString, getLastImage, bufferToArrayBuffer } from "./utils";
 import { exec, spawnSync, spawn } from "child_process";
 import { Notice, requestUrl } from "obsidian";
 import imageAutoUploadPlugin from "./main";
 
 export interface PicGoResponse {
-  success: string;
   msg: string;
   result: string[];
   fullResult: Record<string, any>[];
@@ -20,15 +22,36 @@ export class PicGoUploader {
     this.plugin = plugin;
   }
 
-  async uploadFiles(fileList: Array<String>): Promise<any> {
-    const response = await requestUrl({
-      url: this.settings.uploadServer,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ list: fileList }),
-    });
+  async uploadFiles(fileList: Array<string>): Promise<any> {
+    let response: any;
+    let data: PicGoResponse;
 
-    const data = await response.json;
+    if (this.settings.remoteServerMode) {
+      const files = [];
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        const buffer: Buffer = await new Promise((resolve, reject) => {
+          readFile(file, (err, data) => {
+            if (err) {
+              reject(err);
+            }
+            resolve(data);
+          });
+        });
+        const arrayBuffer = bufferToArrayBuffer(buffer);
+        files.push(new File([arrayBuffer], file));
+      }
+      response = await this.uploadFileByData(files);
+      data = await response.json();
+    } else {
+      response = await requestUrl({
+        url: this.settings.uploadServer,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ list: fileList }),
+      });
+      data = await response.json;
+    }
 
     // piclist
     if (data.fullResult) {
@@ -42,13 +65,45 @@ export class PicGoUploader {
     return data;
   }
 
-  async uploadFileByClipboard(): Promise<any> {
-    const res = await requestUrl({
-      url: this.settings.uploadServer,
-      method: "POST",
-    });
+  async uploadFileByData(fileList: FileList | File[]): Promise<any> {
+    const form = new FormData();
+    for (let i = 0; i < fileList.length; i++) {
+      form.append("list", fileList[i]);
+    }
 
-    let data: PicGoResponse = await res.json;
+    const options = {
+      method: "post",
+      body: form,
+    };
+
+    const response = await fetch(this.settings.uploadServer, options);
+    console.log("response", response);
+    return response;
+  }
+
+  async uploadFileByClipboard(fileList?: FileList): Promise<any> {
+    let data: PicGoResponse;
+    let res: any;
+
+    if (this.settings.remoteServerMode) {
+      res = await this.uploadFileByData(fileList);
+      data = await res.json();
+    } else {
+      res = await requestUrl({
+        url: this.settings.uploadServer,
+        method: "POST",
+      });
+
+      data = await res.json;
+    }
+
+    if (res.status !== 200) {
+      return {
+        code: -1,
+        msg: data.msg,
+        data: "",
+      };
+    }
 
     // piclist
     if (data.fullResult) {
@@ -60,20 +115,11 @@ export class PicGoUploader {
       this.plugin.saveSettings();
     }
 
-    if (res.status !== 200) {
-      let err = { response: data, body: data.msg };
-      return {
-        code: -1,
-        msg: data.msg,
-        data: "",
-      };
-    } else {
-      return {
-        code: 0,
-        msg: "success",
-        data: typeof data.result == "string" ? data.result : data.result[0],
-      };
-    }
+    return {
+      code: 0,
+      msg: "success",
+      data: typeof data.result == "string" ? data.result : data.result[0],
+    };
   }
 }
 
