@@ -120,19 +120,26 @@ export default class imageAutoUploadPlugin extends Plugin {
             return;
           }
           const selection = editor.getSelection();
+          const tryAddByUrl = (markdownUrl: string) => {
+            const matched = this.settings.uploadedImages.find((item: { imgUrl: string; shortUrl?: string }) => {
+              const url0 = item.imgUrl?.split(",")[0];
+              return url0 === markdownUrl || item.shortUrl === markdownUrl;
+            });
+            if (matched) this.addRemoveMenu(menu, markdownUrl, editor);
+          };
           if (selection) {
             const markdownRegex = /!\[.*\]\((.*)\)/g;
             const markdownMatch = markdownRegex.exec(selection);
             if (markdownMatch && markdownMatch.length > 1) {
-              const markdownUrl = markdownMatch[1];
-              if (
-                this.settings.uploadedImages.find(
-                  (item: { imgUrl: string }) =>
-                    item.imgUrl?.split(",")[0] === markdownUrl
-                )
-              ) {
-                this.addRemoveMenu(menu, markdownUrl, editor);
-              }
+              tryAddByUrl(markdownMatch[1]);
+            }
+          } else {
+            const cursor = editor.getCursor();
+            const lineText = editor.getLine(cursor.line) || "";
+            const markdownRegex = /!\[[^\]]*\]\(([^\)]+)\)/;
+            const match = lineText.match(markdownRegex);
+            if (match && match[1]) {
+              tryAddByUrl(match[1]);
             }
           }
         }
