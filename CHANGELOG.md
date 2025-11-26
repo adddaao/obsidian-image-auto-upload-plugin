@@ -1,3 +1,37 @@
+# 5.0.0
+
+1. trash respect ob setting
+2. fix remote mod for cors
+3. fix change uploader should restart plugin
+4. **remove fix-path support**
+5. use timestamp name for remote mode
+6. **mobile support**
+
+# 4.1.0(2024.11.28)
+
+1. 修复 ob1.7.5 版本后拖拽时无法上传的 bug [#160](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/160)
+
+# 4.0.1(2024.11.20)
+
+1. 修复无法下载图片的 bug [#83](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/83)
+2. 重构下载模块代码以便之后对 mobile 的支持
+
+# 4.0.0(2024.11.18)
+
+诈个尸
+
+多年前的不成熟之作，感谢各位的使用，已经脱离 ob 的开发太久了，我和代码已经两不相熟，希望这个版本不会带来太多 bug。
+
+1. 移除 node-fetch-native 依赖
+2. 增加`![](<image>)`类型的解析 [#156](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/156)
+3. 增加 md 的 alt 支持 [#143](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/143)
+4. 按 ctrl 键进行拖拽上传时，不再调用上传 [#147](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/147)
+5. Change plugin name to "Image auto upload"
+
+顺便求个赞助，如果本项目对你有帮助，请我喝瓶快乐水吧，有助于项目更好维护。  
+爱发电：[https://afdian.com/a/renmu123](https://afdian.com/a/renmu123)  
+你也可以给我的 B 站帐号 [充电](https://space.bilibili.com/10995238)
+
 # 1.2.0
 
 修复在所见所得版本中（0.13.14）无法使用的 bug 。
@@ -158,4 +192,5 @@ fix [issue42](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issu
 1. 批量上传与下载后验证前后文件路径是否相同，防止覆盖 [[#108]](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/108)
 
 # 3.7.0
-1. support server mode 
+
+1. support server mode

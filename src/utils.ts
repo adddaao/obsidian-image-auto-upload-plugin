@@ -1,6 +1,5 @@
-import { resolve, extname, relative, join, parse, posix } from "path";
+import { extname } from "path-browserify";
 import { Readable } from "stream";
-import { clipboard } from "electron";
 
 export interface IStringKeyMap<T> {
   [key: string]: T;
@@ -25,18 +24,6 @@ export function isAssetTypeAnImage(path: string): Boolean {
   return isAnImage(extname(path));
 }
 
-export function getOS() {
-  const { appVersion } = navigator;
-  if (appVersion.indexOf("Win") !== -1) {
-    return "Windows";
-  } else if (appVersion.indexOf("Mac") !== -1) {
-    return "MacOS";
-  } else if (appVersion.indexOf("X11") !== -1) {
-    return "Linux";
-  } else {
-    return "Unknown OS";
-  }
-}
 export async function streamToString(stream: Readable) {
   const chunks = [];
 
@@ -44,6 +31,7 @@ export async function streamToString(stream: Readable) {
     chunks.push(Buffer.from(chunk));
   }
 
+  // @ts-ignore
   return Buffer.concat(chunks).toString("utf-8");
 }
 
@@ -51,21 +39,6 @@ export function getUrlAsset(url: string) {
   return (url = url.substr(1 + url.lastIndexOf("/")).split("?")[0]).split(
     "#"
   )[0];
-}
-
-export function isCopyImageFile() {
-  let filePath = "";
-  const os = getOS();
-
-  if (os === "Windows") {
-    var rawFilePath = clipboard.read("FileNameW");
-    filePath = rawFilePath.replace(new RegExp(String.fromCharCode(0), "g"), "");
-  } else if (os === "MacOS") {
-    filePath = clipboard.read("public.file-url").replace("file://", "");
-  } else {
-    filePath = "";
-  }
-  return isAssetTypeAnImage(filePath);
 }
 
 export function getLastImage(list: string[]) {
@@ -102,4 +75,17 @@ export function bufferToArrayBuffer(buffer: Buffer) {
     view[i] = buffer[i];
   }
   return arrayBuffer;
+}
+
+export function arrayBufferToBuffer(arrayBuffer: ArrayBuffer) {
+  const buffer = Buffer.alloc(arrayBuffer.byteLength);
+  const view = new Uint8Array(arrayBuffer);
+  for (let i = 0; i < buffer.length; ++i) {
+    buffer[i] = view[i];
+  }
+  return buffer;
+}
+
+export function uuid() {
+  return Math.random().toString(36).slice(2);
 }

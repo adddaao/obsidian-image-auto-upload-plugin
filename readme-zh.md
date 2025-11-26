@@ -3,6 +3,8 @@
 这是一个支持 PicGo、PicList、PicGo-Core 上传图片到图床的工具
 **更新插件后记得重启一下 Obsidian**
 
+**未在 Mac 进行过测试**
+
 # 开始
 
 1. 安装 PicGo 工具，并进行配置，配置参考[官网](https://github.com/Molunerfinn/PicGo)
@@ -23,11 +25,12 @@
 ## 剪切板上传
 
 支持黏贴剪切板的图片的时候直接上传，目前支持复制系统内图像直接上传。
-支持通过设置 `frontmatter` 来控制单个文件的上传，默认值为 `true`，控制关闭请将该值设置为 `false`
 
 支持 ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".svg", ".tiff", ".webp", ".avif"
 
 该功能在 PicGo 2.3.0-beta7 版本中无法使用，请更换其他版本
+
+支持通过设置 `frontmatter` 来控制单个文件的上传，默认值为 `true`，控制关闭请将该值设置为 `false`，**实时预览模式下需修改值为复选框**
 
 ```yaml
 ---
@@ -88,6 +91,12 @@ image-auto-upload: true
 设置路径，默认为空，使用环境变量
 也可以设置自定义路径
 
+## 常见问题
+
+### MacOs 下无法长传
+
+参考 [#160](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/160), [#20](https://github.com/renmu123/obsidian-image-auto-upload-plugin/issues/20)
+
 # TODO
 
 - [x] 支持批量上传
@@ -95,3 +104,25 @@ image-auto-upload: true
 - [x] 支持 picgo-core
 - [x] 支持复制系统图片文件
 - [x] 网络图片支持
+- [ ] 支持手机端
+- [ ] 支持更多适配器
+
+# 赞赏
+
+如果本项目对你有帮助，请我喝瓶快乐水吧，有助于项目更好维护。  
+爱发电：[https://afdian.com/a/renmu123](https://afdian.com/a/renmu123)  
+你也可以给我的 B 站帐号 [充电](https://space.bilibili.com/10995238)
+
+# 开发
+
+## 安装
+
+`pnpm install`
+
+## 运行
+
+`pnpm run dev`
+
+## 编译
+
+`pnpm run build`

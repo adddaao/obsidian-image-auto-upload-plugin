@@ -1,7 +1,6 @@
-import { App, PluginSettingTab, Setting, Notice } from "obsidian";
+import { App, PluginSettingTab, Setting, Notice, Platform } from "obsidian";
 import imageAutoUploadPlugin from "./main";
 import { t } from "./lang/helpers";
-import { getOS } from "./utils";
 
 export interface PluginSettings {
   uploadByClipSwitch: boolean;
@@ -12,7 +11,6 @@ export interface PluginSettings {
   picgoCorePath: string;
   workOnNetWork: boolean;
   newWorkBlackDomains: string;
-  fixPath: boolean;
   applyImage: boolean;
   deleteSource: boolean;
   imageDesc: "origin" | "none" | "removeDefault";
@@ -28,7 +26,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   imageSizeSuffix: "",
   picgoCorePath: "",
   workOnNetWork: false,
-  fixPath: false,
   applyImage: true,
   newWorkBlackDomains: "",
   deleteSource: false,
@@ -46,8 +43,6 @@ export class SettingTab extends PluginSettingTab {
 
   display(): void {
     let { containerEl } = this;
-
-    const os = getOS();
 
     containerEl.empty();
     containerEl.createEl("h2", { text: t("Plugin Settings") });
@@ -141,20 +136,6 @@ export class SettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             })
         );
-
-      if (os !== "Windows") {
-        new Setting(containerEl)
-          .setName(t("fixPath"))
-          .setDesc(t("fixPathWarning"))
-          .addToggle(toggle =>
-            toggle
-              .setValue(this.plugin.settings.fixPath)
-              .onChange(async value => {
-                this.plugin.settings.fixPath = value;
-                await this.plugin.saveSettings();
-              })
-          );
-      }
     }
 
     // image desc setting

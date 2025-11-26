@@ -1,7 +1,6 @@
 import {
   MarkdownView,
   Plugin,
-  FileSystemAdapter,
   Editor,
   Menu,
   MenuItem,
@@ -9,43 +8,25 @@ import {
   normalizePath,
   Notice,
   addIcon,
-  requestUrl,
   MarkdownFileInfo,
 } from "obsidian";
+import { resolve, basename, dirname } from "path-browserify";
 
-import { resolve, relative, join, parse, posix, basename, dirname } from "path";
-import { existsSync, mkdirSync, writeFileSync, unlink } from "fs";
-
-import fixPath from "fix-path";
-import imageType from "image-type";
-
-import {
-  isAssetTypeAnImage,
-  isAnImage,
-  getUrlAsset,
-  arrayToObject,
-} from "./utils";
-import { PicGoUploader, PicGoCoreUploader } from "./uploader";
+import { isAssetTypeAnImage, arrayToObject } from "./utils";
+import { downloadAllImageFiles } from "./download";
+import { UploaderManager } from "./uploader/index";
 import { PicGoDeleter } from "./deleter";
 import Helper from "./helper";
 import { t } from "./lang/helpers";
-
 import { SettingTab, PluginSettings, DEFAULT_SETTINGS } from "./setting";
 
-interface Image {
-  path: string;
-  name: string;
-  source: string;
-}
+import type { Image } from "./types";
 
 export default class imageAutoUploadPlugin extends Plugin {
   settings: PluginSettings;
   helper: Helper;
   editor: Editor;
-  picGoUploader: PicGoUploader;
   picGoDeleter: PicGoDeleter;
-  picGoCoreUploader: PicGoCoreUploader;
-  uploader: PicGoUploader | PicGoCoreUploader;
 
   async loadSettings() {
     this.settings = Object.assign(DEFAULT_SETTINGS, await this.loadData());
@@ -61,20 +42,7 @@ export default class imageAutoUploadPlugin extends Plugin {
     await this.loadSettings();
 
     this.helper = new Helper(this.app);
-    this.picGoUploader = new PicGoUploader(this.settings, this);
     this.picGoDeleter = new PicGoDeleter(this);
-    this.picGoCoreUploader = new PicGoCoreUploader(this.settings, this);
-
-    if (this.settings.uploader === "PicGo") {
-      this.uploader = this.picGoUploader;
-    } else if (this.settings.uploader === "PicGo-Core") {
-      this.uploader = this.picGoCoreUploader;
-      if (this.settings.fixPath) {
-        fixPath();
-      }
-    } else {
-      new Notice("unknown uploader");
-    }
 
     addIcon(
       "upload",
@@ -89,7 +57,7 @@ export default class imageAutoUploadPlugin extends Plugin {
       id: "Upload all images",
       name: "Upload all images",
       checkCallback: (checking: boolean) => {
-        let leaf = this.app.workspace.activeLeaf;
+        let leaf = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (leaf) {
           if (!checking) {
             this.uploadAllFile();
@@ -103,21 +71,44 @@ export default class imageAutoUploadPlugin extends Plugin {
       id: "Download all images",
       name: "Download all images",
       checkCallback: (checking: boolean) => {
-        let leaf = this.app.workspace.activeLeaf;
+        let leaf = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (leaf) {
           if (!checking) {
-            this.downloadAllImageFiles();
+            downloadAllImageFiles(this);
           }
           return true;
         }
         return false;
       },
     });
-
     this.setupPasteHandler();
     this.registerFileMenu();
-
     this.registerSelection();
+  }
+
+  /**
+   * 获取当前使用的上传器
+   */
+  getUploader() {
+    const uploader = new UploaderManager(this.settings.uploader, this);
+
+    return uploader;
+  }
+
+  /**
+   * 上传图片
+   */
+  upload(images: Image[] | string[]) {
+    let uploader = this.getUploader();
+    return uploader.upload(images);
+  }
+
+  /**
+   * 通过剪贴板上传图片
+   */
+  uploadByClipboard(fileList?: FileList) {
+    let uploader = this.getUploader();
+    return uploader.uploadByClipboard(fileList);
   }
 
   registerSelection() {
@@ -140,7 +131,7 @@ export default class imageAutoUploadPlugin extends Plugin {
                     item.imgUrl?.split(",")[0] === markdownUrl
                 )
               ) {
-                this.addMenu(menu, markdownUrl, editor);
+                this.addRemoveMenu(menu, markdownUrl, editor);
               }
             }
           }
@@ -149,7 +140,7 @@ export default class imageAutoUploadPlugin extends Plugin {
     );
   }
 
-  addMenu = (menu: Menu, imgPath: string, editor: Editor) => {
+  addRemoveMenu = (menu: Menu, imgPath: string, editor: Editor) => {
     menu.addItem((item: MenuItem) =>
       item
         .setIcon("trash-2")
@@ -185,137 +176,6 @@ export default class imageAutoUploadPlugin extends Plugin {
     );
   };
 
-  async downloadAllImageFiles() {
-    const activeFile = this.app.workspace.getActiveFile();
-    const folderPath = this.getFileAssetPath();
-    const fileArray = this.helper.getAllFiles();
-    if (!existsSync(folderPath)) {
-      mkdirSync(folderPath);
-    }
-
-    let imageArray = [];
-    const nameSet = new Set();
-    for (const file of fileArray) {
-      if (!file.path.startsWith("http")) {
-        continue;
-      }
-
-      const url = file.path;
-      const asset = getUrlAsset(url);
-      let name = decodeURI(parse(asset).name).replaceAll(
-        /[\\\\/:*?\"<>|]/g,
-        "-"
-      );
-
-      // 如果文件名已存在，则用随机值替换，不对文件后缀进行判断
-      if (existsSync(join(folderPath))) {
-        name = (Math.random() + 1).toString(36).substr(2, 5);
-      }
-      if (nameSet.has(name)) {
-        name = `${name}-${(Math.random() + 1).toString(36).substr(2, 5)}`;
-      }
-      nameSet.add(name);
-
-      const response = await this.download(url, folderPath, name);
-      if (response.ok) {
-        const activeFolder = normalizePath(
-          this.app.workspace.getActiveFile().parent.path
-        );
-        const abstractActiveFolder = (
-          this.app.vault.adapter as FileSystemAdapter
-        ).getFullPath(activeFolder);
-
-        imageArray.push({
-          source: file.source,
-          name: name,
-          path: normalizePath(relative(abstractActiveFolder, response.path)),
-        });
-      }
-    }
-
-    let value = this.helper.getValue();
-    imageArray.map(image => {
-      let name = this.handleName(image.name);
-
-      value = value.replace(
-        image.source,
-        `![${name}](${encodeURI(image.path)})`
-      );
-    });
-
-    const currentFile = this.app.workspace.getActiveFile();
-    if (activeFile.path !== currentFile.path) {
-      new Notice(t("File has been changedd, download failure"));
-      return;
-    }
-    this.helper.setValue(value);
-
-    new Notice(
-      `all: ${fileArray.length}\nsuccess: ${imageArray.length}\nfailed: ${
-        fileArray.length - imageArray.length
-      }`
-    );
-  }
-
-  // 获取当前文件所属的附件文件夹
-  getFileAssetPath() {
-    const basePath = (
-      this.app.vault.adapter as FileSystemAdapter
-    ).getBasePath();
-
-    // @ts-ignore
-    const assetFolder: string = this.app.vault.config.attachmentFolderPath;
-    const activeFile = this.app.vault.getAbstractFileByPath(
-      this.app.workspace.getActiveFile().path
-    );
-
-    // 当前文件夹下的子文件夹
-    if (assetFolder.startsWith("./")) {
-      const activeFolder = decodeURI(resolve(basePath, activeFile.parent.path));
-      return join(activeFolder, assetFolder);
-    } else {
-      // 根文件夹
-      return join(basePath, assetFolder);
-    }
-  }
-
-  async download(url: string, folderPath: string, name: string) {
-    const response = await requestUrl({ url });
-    const type = await imageType(new Uint8Array(response.arrayBuffer));
-
-    if (response.status !== 200) {
-      return {
-        ok: false,
-        msg: "error",
-      };
-    }
-    if (!type) {
-      return {
-        ok: false,
-        msg: "error",
-      };
-    }
-
-    const buffer = Buffer.from(response.arrayBuffer);
-
-    try {
-      const path = join(folderPath, `${name}.${type.ext}`);
-
-      writeFileSync(path, buffer);
-      return {
-        ok: true,
-        msg: "ok",
-        path: path,
-        type,
-      };
-    } catch (err) {
-      return {
-        ok: false,
-        msg: err,
-      };
-    }
-  }
-
   registerFileMenu() {
     this.registerEvent(
       this.app.workspace.on(
@@ -326,7 +186,7 @@ export default class imageAutoUploadPlugin extends Plugin {
 
           menu.addItem((item: MenuItem) => {
             item
-              .setTitle("Upload")
+              .setTitle(t("upload"))
               .setIcon("upload")
               .onClick(() => {
                 if (!(file instanceof TFile)) {
@@ -341,11 +201,6 @@ export default class imageAutoUploadPlugin extends Plugin {
   }
 
   fileMenuUpload(file: TFile) {
-    let content = this.helper.getValue();
-
-    const basePath = (
-      this.app.vault.adapter as FileSystemAdapter
-    ).getBasePath();
     let imageList: Image[] = [];
     const fileArray = this.helper.getAllFiles();
 
@@ -356,13 +211,12 @@ export default class imageAutoUploadPlugin extends Plugin {
       const fileName = basename(decodeURI(encodedUri));
 
       if (file && file.name === fileName) {
-        const abstractImageFile = join(basePath, file.path);
-
-        if (isAssetTypeAnImage(abstractImageFile)) {
+        if (isAssetTypeAnImage(file.path)) {
           imageList.push({
-            path: abstractImageFile,
+            path: file.path,
             name: imageName,
             source: match.source,
+            file: file,
           });
         }
       }
@@ -373,30 +227,14 @@ export default class imageAutoUploadPlugin extends Plugin {
       return;
     }
 
-    this.uploader.uploadFiles(imageList.map(item => item.path)).then(res => {
-      if (res.success) {
-        let uploadUrlList = res.result;
-        imageList.map(item => {
-          const uploadImage = uploadUrlList.shift();
-          let name = this.handleName(item.name);
-
-          content = content.replaceAll(
-            item.source,
-            `![${name}](${uploadImage})`
-          );
-        });
-        this.helper.setValue(content);
-
-        if (this.settings.deleteSource) {
-          imageList.map(image => {
-            if (!image.path.startsWith("http")) {
-              unlink(image.path, () => {});
-            }
-          });
-        }
-      } else {
+    this.upload(imageList).then(res => {
+      if (!res.success) {
         new Notice("Upload error");
+        return;
       }
+
+      let uploadUrlList = res.result;
+      this.replaceImage(imageList, uploadUrlList);
     });
   }
 
@@ -430,80 +268,81 @@ export default class imageAutoUploadPlugin extends Plugin {
 
     return imageList;
   }
-  getFile(fileName: string, fileMap: any) {
-    if (!fileMap) {
-      fileMap = arrayToObject(this.app.vault.getFiles(), "name");
-    }
-    return fileMap[fileName];
-  }
-  // uploda all file
-  uploadAllFile() {
+
+  /**
+   * 替换上传的图片
+   */
+  replaceImage(imageList: Image[], uploadUrlList: string[]) {
     let content = this.helper.getValue();
 
-    const basePath = (
-      this.app.vault.adapter as FileSystemAdapter
-    ).getBasePath();
+    imageList.map(item => {
+      const uploadImage = uploadUrlList.shift();
+
+      let name = this.handleName(item.name);
+      content = content.replaceAll(item.source, `![${name}](${uploadImage})`);
+    });
+
+    this.helper.setValue(content);
+
+    if (this.settings.deleteSource) {
+      imageList.map(image => {
+        if (image.file && !image.path.startsWith("http")) {
+          this.app.fileManager.trashFile(image.file);
+        }
+      });
+    }
+  }
+
+  /**
+   * 上传所有图片
+   */
+  uploadAllFile() {
     const activeFile = this.app.workspace.getActiveFile();
     const fileMap = arrayToObject(this.app.vault.getFiles(), "name");
     const filePathMap = arrayToObject(this.app.vault.getFiles(), "path");
-    let imageList: Image[] = [];
+    let imageList: (Image & { file: TFile | null })[] = [];
     const fileArray = this.filterFile(this.helper.getAllFiles());
 
     for (const match of fileArray) {
       const imageName = match.name;
-      const encodedUri = match.path;
+      const uri = decodeURI(match.path);
 
-      if (encodedUri.startsWith("http")) {
+      if (uri.startsWith("http")) {
         imageList.push({
           path: match.path,
           name: imageName,
           source: match.source,
+          file: null,
         });
       } else {
-        const fileName = basename(decodeURI(encodedUri));
-        let file;
-        // 绝对路径
-        if (filePathMap[decodeURI(encodedUri)]) {
-          file = filePathMap[decodeURI(encodedUri)];
+        const fileName = basename(uri);
+        let file: TFile | undefined | null;
+        // 优先匹配绝对路径
+        if (filePathMap[uri]) {
+          file = filePathMap[uri];
         }
 
         // 相对路径
-        if (
-          (!file && decodeURI(encodedUri).startsWith("./")) ||
-          decodeURI(encodedUri).startsWith("../")
-        ) {
-          const filePath = resolve(
-            join(basePath, dirname(activeFile.path)),
-            decodeURI(encodedUri)
+        if ((!file && uri.startsWith("./")) || uri.startsWith("../")) {
+          const filePath = normalizePath(
+            resolve(dirname(activeFile.path), uri)
           );
 
-          if (existsSync(filePath)) {
-            const path = normalizePath(
-              relative(
-                basePath,
-                resolve(
-                  join(basePath, dirname(activeFile.path)),
-                  decodeURI(encodedUri)
-                )
-              )
-            );
-
-            file = filePathMap[path];
-          }
+          file = filePathMap[filePath];
         }
+
         // 尽可能短路径
         if (!file) {
-          file = this.getFile(fileName, fileMap);
+          file = fileMap[fileName];
         }
 
         if (file) {
-          const abstractImageFile = join(basePath, file.path);
-
-          if (isAssetTypeAnImage(abstractImageFile)) {
+          if (isAssetTypeAnImage(file.path)) {
             imageList.push({
-              path: abstractImageFile,
+              path: normalizePath(file.path),
               name: imageName,
               source: match.source,
+              file: file,
             });
           }
         }
@@ -514,45 +353,24 @@ export default class imageAutoUploadPlugin extends Plugin {
       new Notice(t("Can not find image file"));
       return;
     } else {
-      new Notice(`共找到${imageList.length}个图像文件，开始上传`);
+      new Notice(`Have found ${imageList.length} images`);
     }
 
-    this.uploader.uploadFiles(imageList.map(item => item.path)).then(res => {
-      if (res.success) {
-        let uploadUrlList = res.result;
-
-        if (imageList.length !== uploadUrlList.length) {
-          new Notice(
-            t("Warning: upload files is different of reciver files from api")
-          );
-        }
-
-        imageList.map(item => {
-          const uploadImage = uploadUrlList.shift();
-
-          let name = this.handleName(item.name);
-          content = content.replaceAll(
-            item.source,
-            `![${name}](${uploadImage})`
-          );
-        });
-        const currentFile = this.app.workspace.getActiveFile();
-        if (activeFile.path !== currentFile.path) {
-          new Notice(t("File has been changedd, upload failure"));
-          return;
-        }
-        this.helper.setValue(content);
-
-        if (this.settings.deleteSource) {
-          imageList.map(image => {
-            if (!image.path.startsWith("http")) {
-              unlink(image.path, () => {});
-            }
-          });
-        }
-      } else {
-        new Notice("Upload error");
+    this.upload(imageList).then(res => {
+      let uploadUrlList = res.result;
+      if (imageList.length !== uploadUrlList.length) {
+        new Notice(
+          t("Warning: upload files is different of reciver files from api")
+        );
+        return;
       }
+      const currentFile = this.app.workspace.getActiveFile();
+      if (activeFile.path !== currentFile.path) {
+        new Notice(t("File has been changedd, upload failure"));
+        return;
+      }
+
+      this.replaceImage(imageList, uploadUrlList);
     });
   }
 
@@ -586,26 +404,10 @@ export default class imageAutoUploadPlugin extends Plugin {
               );
 
             if (imageList.length !== 0) {
-              this.uploader
-                .uploadFiles(imageList.map(item => item.path))
-                .then(res => {
-                  let value = this.helper.getValue();
-                  if (res.success) {
-                    let uploadUrlList = res.result;
-                    imageList.map(item => {
-                      const uploadImage = uploadUrlList.shift();
-                      let name = this.handleName(item.name);
-
-                      value = value.replaceAll(
-                        item.source,
-                        `![${name}](${uploadImage})`
-                      );
-                    });
-                    this.helper.setValue(value);
-                  } else {
-                    new Notice("Upload error");
-                  }
-                });
+              this.upload(imageList).then(res => {
+                let uploadUrlList = res.result;
+                this.replaceImage(imageList, uploadUrlList);
+              });
             }
           }
 
@@ -615,9 +417,7 @@ export default class imageAutoUploadPlugin extends Plugin {
               editor,
               async (editor: Editor, pasteId: string) => {
                 let res: any;
-                res = await this.uploader.uploadFileByClipboard(
-                  evt.clipboardData.files
-                );
+                res = await this.uploadByClipboard(evt.clipboardData.files);
 
                 if (res.code !== 0) {
                   this.handleFailedUpload(editor, pasteId, res.msg);
@@ -638,25 +438,35 @@ export default class imageAutoUploadPlugin extends Plugin {
       this.app.workspace.on(
         "editor-drop",
         async (evt: DragEvent, editor: Editor, markdownView: MarkdownView) => {
+          // when ctrl key is pressed, do not upload image, because it is used to set local file
+          if (evt.ctrlKey) {
+            return;
+          }
           const allowUpload = this.helper.getFrontmatterValue(
             "image-auto-upload",
             this.settings.uploadByClipSwitch
           );
-          let files = evt.dataTransfer.files;
 
           if (!allowUpload) {
             return;
           }
 
+          let files = evt.dataTransfer.files;
           if (files.length !== 0 && files[0].type.startsWith("image")) {
             let sendFiles: Array<string> = [];
             let files = evt.dataTransfer.files;
             Array.from(files).forEach((item, index) => {
-              sendFiles.push(item.path);
+              if (item.path) {
+                sendFiles.push(item.path);
+              } else {
+                const { webUtils } = require("electron");
+                const path = webUtils.getPathForFile(item);
+                sendFiles.push(path);
+              }
             });
             evt.preventDefault();
 
-            const data = await this.uploader.uploadFiles(sendFiles);
+            const data = await this.upload(sendFiles);
 
             if (data.success) {
               data.result.map((value: string) => {
