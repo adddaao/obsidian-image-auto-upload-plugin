@@ -19,6 +19,7 @@ import { PicGoDeleter } from "./deleter";
 import Helper from "./helper";
 import { t } from "./lang/helpers";
 import { SettingTab, PluginSettings, DEFAULT_SETTINGS } from "./setting";
+import { ImageStore } from "./store";
 
 import type { Image } from "./types";
 
@@ -27,6 +28,7 @@ export default class imageAutoUploadPlugin extends Plugin {
   helper: Helper;
   editor: Editor;
   picGoDeleter: PicGoDeleter;
+  imageStore: ImageStore;
 
   async loadSettings() {
     this.settings = Object.assign(DEFAULT_SETTINGS, await this.loadData());
@@ -43,6 +45,11 @@ export default class imageAutoUploadPlugin extends Plugin {
 
     this.helper = new Helper(this.app);
     this.picGoDeleter = new PicGoDeleter(this);
+    this.imageStore = new ImageStore(
+      this.app.vault.adapter,
+      normalizePath(`${this.manifest.dir}/image-map.json`)
+    );
+    await this.imageStore.load();
 
     addIcon(
       "upload",
@@ -55,7 +62,7 @@ export default class imageAutoUploadPlugin extends Plugin {
 
     this.addCommand({
       id: "Upload all images",
-      name: "Upload all images",
+      name: t("Upload all images"),
       checkCallback: (checking: boolean) => {
         let leaf = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (leaf) {
@@ -69,12 +76,40 @@ export default class imageAutoUploadPlugin extends Plugin {
     });
     this.addCommand({
       id: "Download all images",
-      name: "Download all images",
+      name: t("Download all images"),
       checkCallback: (checking: boolean) => {
         let leaf = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (leaf) {
           if (!checking) {
             downloadAllImageFiles(this);
+          }
+          return true;
+        }
+        return false;
+      },
+    });
+    this.addCommand({
+      id: "Switch to Local URL",
+      name: t("Switch to Local URL"),
+      checkCallback: (checking: boolean) => {
+        let leaf = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (leaf) {
+          if (!checking) {
+            this.switchToLocal();
+          }
+          return true;
+        }
+        return false;
+      },
+    });
+    this.addCommand({
+      id: "Switch to Remote URL",
+      name: t("Switch to Remote URL"),
+      checkCallback: (checking: boolean) => {
+        let leaf = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (leaf) {
+          if (!checking) {
+            this.switchToRemote();
           }
           return true;
         }
@@ -119,6 +154,51 @@ export default class imageAutoUploadPlugin extends Plugin {
           if (this.app.workspace.getLeavesOfType("markdown").length === 0) {
             return;
           }
+
+          if (this.settings.showUploadAll) {
+            menu.addItem((item: MenuItem) =>
+              item
+                .setIcon("upload")
+                .setTitle(t("Upload all images"))
+                .onClick(() => {
+                  this.uploadAllFile();
+                })
+            );
+          }
+
+          if (this.settings.showDownloadAll) {
+            menu.addItem((item: MenuItem) =>
+              item
+                .setIcon("download")
+                .setTitle(t("Download all images"))
+                .onClick(() => {
+                  downloadAllImageFiles(this);
+                })
+            );
+          }
+
+          if (this.settings.showSwitchToLocal) {
+            menu.addItem((item: MenuItem) =>
+              item
+                .setIcon("refresh-ccw")
+                .setTitle(t("Switch to Local URL"))
+                .onClick(() => {
+                  this.switchToLocal();
+                })
+            );
+          }
+
+          if (this.settings.showSwitchToRemote) {
+            menu.addItem((item: MenuItem) =>
+              item
+                .setIcon("cloud")
+                .setTitle(t("Switch to Remote URL"))
+                .onClick(() => {
+                  this.switchToRemote();
+                })
+            );
+          }
+
           const selection = editor.getSelection();
           const tryAddByUrl = (markdownUrl: string) => {
             const matched = this.settings.uploadedImages.find((item: { imgUrl: string; shortUrl?: string }) => {
@@ -236,7 +316,7 @@ export default class imageAutoUploadPlugin extends Plugin {
 
     this.upload(imageList).then(res => {
       if (!res.success) {
-        new Notice("Upload error");
+        new Notice(t("Upload error"));
         return;
       }
 
@@ -377,8 +457,139 @@ export default class imageAutoUploadPlugin extends Plugin {
         return;
       }
 
-      this.replaceImage(imageList, uploadUrlList);
+      // 更新映射
+      imageList.forEach((item, index) => {
+        if (item.file) {
+          this.imageStore.set(item.file.path, uploadUrlList[index]);
+        }
+      });
     });
+  }
+
+  /**
+   * 切换为本地地址
+   */
+  async switchToLocal() {
+    const activeFile = this.app.workspace.getActiveFile();
+    const fileArray = this.filterFile(this.helper.getAllFiles());
+    let value = this.helper.getValue();
+    let hasChange = false;
+
+    // 1. 遍历所有图片
+    for (const match of fileArray) {
+      if (match.path.startsWith("http")) {
+        // 2. 检查是否有本地映射
+        let localPath = this.imageStore.getLocal(match.path);
+        
+        if (localPath) {
+           // 3. 检查文件是否存在
+           if (await this.app.vault.adapter.exists(localPath)) {
+             value = value.replace(match.source, `![${match.name}](${encodeURI(localPath)})`);
+             hasChange = true;
+             continue;
+           }
+        }
+        
+        // 4. 如果没有映射或文件不存在，这里不自动下载，因为是“切换”操作
+        // 如果用户想要下载，应该使用“Download all images”
+        // 或者我们可以尝试通过文件名推断本地路径（可选优化）
+      }
+    }
+
+    if (hasChange) {
+      this.helper.setValue(value);
+      new Notice(t("Switch to local URL successfully"));
+    } else {
+      new Notice(t("No local URL found"));
+    }
+  }
+
+  /**
+   * 切换为线上地址
+   */
+  async switchToRemote() {
+    let imageList: (Image & { file: TFile | null })[] = [];
+    const fileArray = this.filterFile(this.helper.getAllFiles());
+    const fileMap = arrayToObject(this.app.vault.getFiles(), "name");
+    const filePathMap = arrayToObject(this.app.vault.getFiles(), "path");
+    const activeFile = this.app.workspace.getActiveFile();
+    
+    let value = this.helper.getValue();
+    let hasChange = false;
+
+    for (const match of fileArray) {
+      const uri = decodeURI(match.path);
+      if (uri.startsWith("http")) {
+        // 检查是否是默认图床
+        if (this.settings.uploadServer) {
+           // 简单判断，如果是 PicList/PicGo 默认上传的，通常会有配置的域名
+           // 这里逻辑比较复杂，暂时只处理非 http 的本地图片
+        }
+      } else {
+        // 本地图片
+        // 1. 检查是否有映射
+        // 需要解析出相对路径对应的 path
+        let file: TFile | undefined | null;
+        if (filePathMap[uri]) {
+          file = filePathMap[uri];
+        }
+        if ((!file && uri.startsWith("./")) || uri.startsWith("../")) {
+          const filePath = normalizePath(resolve(dirname(activeFile.path), uri));
+          file = filePathMap[filePath];
+        }
+        if (!file) {
+          file = fileMap[basename(uri)];
+        }
+
+        if (file) {
+          const remoteUrl = this.imageStore.getRemote(file.path);
+          if (remoteUrl) {
+            value = value.replace(match.source, `![${match.name}](${remoteUrl})`);
+            hasChange = true;
+          } else {
+            // 没有映射，加入待上传列表
+             if (isAssetTypeAnImage(file.path)) {
+                imageList.push({
+                  path: normalizePath(file.path),
+                  name: match.name,
+                  source: match.source,
+                  file: file,
+                });
+             }
+          }
+        }
+      }
+    }
+    
+    if (hasChange) {
+      this.helper.setValue(value);
+    }
+
+    // 对没有映射的进行上传
+    if (imageList.length > 0) {
+      this.upload(imageList).then(res => {
+        if (!res.success) {
+          new Notice(t("Upload error"));
+          return;
+        }
+        
+        let uploadUrlList = res.result;
+        // 更新映射
+        imageList.forEach((item, index) => {
+           if (item.file) {
+             this.imageStore.set(item.file.path, uploadUrlList[index]);
+           }
+        });
+        
+        this.replaceImage(imageList, uploadUrlList);
+      });
+    } else {
+        if (hasChange) {
+             new Notice(t("Switch to remote URL successfully"));
+        } else {
+             new Notice(t("No local image found"));
+        }
+    }
   }
 
   setupPasteHandler() {
@@ -482,7 +693,7 @@ export default class imageAutoUploadPlugin extends Plugin {
                 this.embedMarkDownImage(editor, pasteId, value, files[0].name);
               });
             } else {
-              new Notice("Upload error");
+              new Notice(t("Upload error"));
             }
           }
         }
@@ -553,13 +764,13 @@ export default class imageAutoUploadPlugin extends Plugin {
   }
 
   handleFailedUpload(editor: Editor, pasteId: string, reason: any) {
-    new Notice(reason);
+    new Notice(t(reason));
     console.error("Failed request: ", reason);
     let progressText = imageAutoUploadPlugin.progressTextFor(pasteId);
     imageAutoUploadPlugin.replaceFirstOccurrence(
       editor,
       progressText,
-      "⚠️upload failed, check dev console"
+      t("upload failed, check dev console")
     );
   }
 

@@ -52,6 +52,29 @@ export default {
   "File has been changedd, download failure":
     "File has been changedd, download failure",
   "Warning: upload files is different of reciver files from api":
-    "Warning: upload files num is different of reciver files from api",
+    "Warning: upload files is different of receiver files from api",
   upload: "Upload",
+  "Upload all images": "Upload all images",
+  "Download all images": "Download all images",
+  "Upload error": "Upload error",
+  "Have found": "Have found",
+  "images": "images",
+  "Can only work when remote server mode is off.":
+    "Can only work when remote server mode is off.",
+  "upload failed, check dev console": "upload failed, check dev console",
+  "Custom Download Path": "Custom Download Path",
+  "Custom Download Path Description":
+    "Custom download path, relative to the current file, use ${filename} to replace the current file name.",
+  "Please input custom download path": "Please input custom download path",
+  "Context Menu Settings": "Context Menu Settings",
+  "Show 'Upload all images'": "Show 'Upload all images'",
+  "Show 'Download all images'": "Show 'Download all images'",
+  "Show 'Switch to Local URL'": "Show 'Switch to Local URL'",
+  "Show 'Switch to Remote URL'": "Show 'Switch to Remote URL'",
+  "Switch to Local URL": "Switch to Local URL",
+  "Switch to Remote URL": "Switch to Remote URL",
+  "Switch to local URL successfully": "Switch to local URL successfully",
+  "No local URL found": "No local URL found",
+  "Switch to remote URL successfully": "Switch to remote URL successfully",
+  "No local image found": "No local image found",
 };

@@ -15,6 +15,11 @@ export interface PluginSettings {
   deleteSource: boolean;
   imageDesc: "origin" | "none" | "removeDefault";
   remoteServerMode: boolean;
+  customDownloadPath: string;
+  showUploadAll: boolean;
+  showDownloadAll: boolean;
+  showSwitchToLocal: boolean;
+  showSwitchToRemote: boolean;
   [propName: string]: any;
 }
 
@@ -31,6 +36,11 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   deleteSource: false,
   imageDesc: "origin",
   remoteServerMode: false,
+  customDownloadPath: "",
+  showUploadAll: true,
+  showDownloadAll: true,
+  showSwitchToLocal: true,
+  showSwitchToRemote: true,
 };
 
 export class SettingTab extends PluginSettingTab {
@@ -169,6 +179,78 @@ export class SettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName(t("Custom Download Path"))
+      .setDesc(t("Custom Download Path Description"))
+      .addText(text =>
+        text
+          .setPlaceholder(t("Please input custom download path"))
+          .setValue(this.plugin.settings.customDownloadPath)
+          .onChange(async key => {
+            this.plugin.settings.customDownloadPath = key;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Delete source file after you upload file"))
+      .setDesc(t("Delete source file in ob assets after you upload file."))
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.deleteSource)
+          .onChange(async value => {
+            this.plugin.settings.deleteSource = value;
+            this.display();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    containerEl.createEl("h3", { text: t("Context Menu Settings") });
+
+    new Setting(containerEl)
+      .setName(t("Show 'Upload all images'"))
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.showUploadAll)
+          .onChange(async value => {
+            this.plugin.settings.showUploadAll = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Show 'Download all images'"))
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.showDownloadAll)
+          .onChange(async value => {
+            this.plugin.settings.showDownloadAll = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Show 'Switch to Local URL'"))
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.showSwitchToLocal)
+          .onChange(async value => {
+            this.plugin.settings.showSwitchToLocal = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Show 'Switch to Remote URL'"))
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.showSwitchToRemote)
+          .onChange(async value => {
+            this.plugin.settings.showSwitchToRemote = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName(t("Work on network"))
       .setDesc(t("Work on network Description"))
       .addToggle(toggle =>
@@ -176,7 +258,7 @@ export class SettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.workOnNetWork)
           .onChange(async value => {
             if (this.plugin.settings.remoteServerMode) {
-              new Notice("Can only work when remote server mode is off.");
+              new Notice(t("Can only work when remote server mode is off."));
               this.plugin.settings.workOnNetWork = false;
             } else {
               this.plugin.settings.workOnNetWork = value;
@@ -210,19 +292,6 @@ export class SettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.applyImage)
           .onChange(async value => {
             this.plugin.settings.applyImage = value;
-            this.display();
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName(t("Delete source file after you upload file"))
-      .setDesc(t("Delete source file in ob assets after you upload file."))
-      .addToggle(toggle =>
-        toggle
-          .setValue(this.plugin.settings.deleteSource)
-          .onChange(async value => {
-            this.plugin.settings.deleteSource = value;
             this.display();
             await this.plugin.saveSettings();
           })

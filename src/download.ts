@@ -9,9 +9,19 @@ import type imageAutoUploadPlugin from "./main";
 
 export async function downloadAllImageFiles(plugin: imageAutoUploadPlugin) {
   const activeFile = plugin.app.workspace.getActiveFile();
-  const folderPath = await plugin.app.fileManager.getAvailablePathForAttachment(
+  let folderPath = await plugin.app.fileManager.getAvailablePathForAttachment(
     ""
   );
+
+  if (plugin.settings.customDownloadPath) {
+    const parentPath = activeFile.parent.path;
+    const filename = activeFile.basename;
+    const customPath = plugin.settings.customDownloadPath.replace(
+      "${filename}",
+      filename
+    );
+    folderPath = normalizePath(join(parentPath, customPath));
+  }
 
   const fileArray = plugin.helper.getAllFiles();
 
@@ -32,30 +42,20 @@ export async function downloadAllImageFiles(plugin: imageAutoUploadPlugin) {
     const response = await download(plugin, url, folderPath, name);
     if (response.ok) {
       const activeFolder = plugin.app.workspace.getActiveFile().parent.path;
+      const relativePath = normalizePath(
+        relative(normalizePath(activeFolder), normalizePath(response.path))
+      );
+
+      // 更新映射
+      plugin.imageStore.set(response.path, url);
 
       imageArray.push({
         source: file.source,
         name: name,
-        path: normalizePath(
-          relative(normalizePath(activeFolder), normalizePath(response.path))
-        ),
+        path: relativePath,
       });
     }
   }
-
-  let value = plugin.helper.getValue();
-  imageArray.map(image => {
-    let name = plugin.handleName(image.name);
-
-    value = value.replace(image.source, `![${name}](${encodeURI(image.path)})`);
-  });
-
-  const currentFile = plugin.app.workspace.getActiveFile();
-  if (activeFile.path !== currentFile.path) {
-    new Notice(t("File has been changedd, download failure"));
-    return;
-  }
-  plugin.helper.setValue(value);
 
   new Notice(
     `all: ${fileArray.length}\nsuccess: ${imageArray.length}\nfailed: ${

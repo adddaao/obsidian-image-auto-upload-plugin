@@ -48,4 +48,27 @@ export default {
   "Warning: upload files is different of reciver files from api":
     "警告：上传的文件与接口返回的文件数量不一致",
   upload: "上传",
+  "Upload all images": "上传所有图片",
+  "Download all images": "下载所有图片",
+  "Upload error": "上传错误",
+  "Have found": "发现了",
+  "images": "张图片",
+  "Can only work when remote server mode is off.":
+    "只有关闭远程服务器模式时才能工作",
+  "upload failed, check dev console": "上传失败，请检查控制台",
+  "Custom Download Path": "自定义下载路径",
+  "Custom Download Path Description":
+    "自定义下载路径，相对于当前文件，使用 ${filename} 替换当前文件名",
+  "Please input custom download path": "请输入自定义下载路径",
+  "Context Menu Settings": "右键菜单设置",
+  "Show 'Upload all images'": "显示“上传所有图片”",
+  "Show 'Download all images'": "显示“下载所有图片”",
+  "Show 'Switch to Local URL'": "显示“切换为本地地址”",
+  "Show 'Switch to Remote URL'": "显示“切换为线上地址”",
+  "Switch to Local URL": "切换为本地地址",
+  "Switch to Remote URL": "切换为线上地址",
+  "Switch to local URL successfully": "切换本地地址成功",
+  "No local URL found": "未找到本地地址",
+  "Switch to remote URL successfully": "切换线上地址成功",
+  "No local image found": "未找到本地图片",
 };
