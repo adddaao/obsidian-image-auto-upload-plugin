@@ -20,6 +20,7 @@ export interface PluginSettings {
   showDownloadAll: boolean;
   showSwitchToLocal: boolean;
   showSwitchToRemote: boolean;
+  replaceLinkWhenUploadAll: boolean;
   [propName: string]: any;
 }
 
@@ -41,6 +42,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   showDownloadAll: true,
   showSwitchToLocal: true,
   showSwitchToRemote: true,
+  replaceLinkWhenUploadAll: true,
 };
 
 export class SettingTab extends PluginSettingTab {
@@ -204,7 +206,19 @@ export class SettingTab extends PluginSettingTab {
           })
       );
 
-    containerEl.createEl("h3", { text: t("Context Menu Settings") });
+    new Setting(containerEl)
+      .setName(t("Replace links"))
+      .setDesc(t("Do you want to replace local image links with online links in the document?"))
+      .addToggle(toggle =>
+        toggle
+          .setValue(this.plugin.settings.replaceLinkWhenUploadAll)
+          .onChange(async value => {
+            this.plugin.settings.replaceLinkWhenUploadAll = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    containerEl.createEl("h2", { text: t("Context Menu Settings") });
 
     new Setting(containerEl)
       .setName(t("Show 'Upload all images'"))

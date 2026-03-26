@@ -38,7 +38,7 @@ export default class imageAutoUploadPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  onunload() {}
+  onunload() { }
 
   async onload() {
     await this.loadSettings();
@@ -445,24 +445,56 @@ export default class imageAutoUploadPlugin extends Plugin {
 
     this.upload(imageList).then(res => {
       let uploadUrlList = res.result;
-      if (imageList.length !== uploadUrlList.length) {
+
+      let successCount = 0;
+      let failedCount = 0;
+      let successfulImages: Image[] = [];
+      let successfulUrls: string[] = [];
+
+      if (res.success && uploadUrlList) {
+        uploadUrlList.forEach((url: string, index: number) => {
+          if (url) {
+            successCount++;
+            successfulImages.push(imageList[index]);
+            successfulUrls.push(url);
+          } else {
+            failedCount++;
+          }
+        });
+      } else {
+        failedCount = imageList.length;
+      }
+
+      if (uploadUrlList && imageList.length !== uploadUrlList.length) {
         new Notice(
           t("Warning: upload files is different of reciver files from api")
         );
-        return;
       }
+
       const currentFile = this.app.workspace.getActiveFile();
-      if (activeFile.path !== currentFile.path) {
+      if (activeFile.path !== currentFile?.path) {
         new Notice(t("File has been changedd, upload failure"));
         return;
       }
 
       // 更新映射
-      imageList.forEach((item, index) => {
-        if (item.file) {
-          this.imageStore.set(item.file.path, uploadUrlList[index]);
-        }
-      });
+      if (uploadUrlList) {
+        imageList.forEach((item, index) => {
+          if (item.file && uploadUrlList[index]) {
+            this.imageStore.set(item.file.path, uploadUrlList[index]);
+          }
+        });
+      }
+
+      if (this.settings.replaceLinkWhenUploadAll && successfulImages.length > 0) {
+        this.replaceImage(successfulImages, successfulUrls);
+      }
+
+      new Notice(
+        `${t("Upload complete")}\n${t("All")}: ${imageList.length}\n${t("Success")}: ${successCount}\n${t("Failed")}: ${failedCount}`
+      );
+    }).catch(err => {
+      new Notice(`${t("Upload error")}: ${err}`);
     });
   }
 
@@ -480,16 +512,16 @@ export default class imageAutoUploadPlugin extends Plugin {
       if (match.path.startsWith("http")) {
         // 2. 检查是否有本地映射
         let localPath = this.imageStore.getLocal(match.path);
-        
+
         if (localPath) {
-           // 3. 检查文件是否存在
-           if (await this.app.vault.adapter.exists(localPath)) {
-             value = value.replace(match.source, `![${match.name}](${encodeURI(localPath)})`);
-             hasChange = true;
-             continue;
-           }
+          // 3. 检查文件是否存在
+          if (await this.app.vault.adapter.exists(localPath)) {
+            value = value.replace(match.source, `![${match.name}](${encodeURI(localPath)})`);
+            hasChange = true;
+            continue;
+          }
         }
-        
+
         // 4. 如果没有映射或文件不存在，这里不自动下载，因为是“切换”操作
         // 如果用户想要下载，应该使用“Download all images”
         // 或者我们可以尝试通过文件名推断本地路径（可选优化）
@@ -513,7 +545,7 @@ export default class imageAutoUploadPlugin extends Plugin {
     const fileMap = arrayToObject(this.app.vault.getFiles(), "name");
     const filePathMap = arrayToObject(this.app.vault.getFiles(), "path");
     const activeFile = this.app.workspace.getActiveFile();
-    
+
     let value = this.helper.getValue();
     let hasChange = false;
 
@@ -522,8 +554,8 @@ export default class imageAutoUploadPlugin extends Plugin {
       if (uri.startsWith("http")) {
         // 检查是否是默认图床
         if (this.settings.uploadServer) {
-           // 简单判断，如果是 PicList/PicGo 默认上传的，通常会有配置的域名
-           // 这里逻辑比较复杂，暂时只处理非 http 的本地图片
+          // 简单判断，如果是 PicList/PicGo 默认上传的，通常会有配置的域名
+          // 这里逻辑比较复杂，暂时只处理非 http 的本地图片
         }
       } else {
         // 本地图片
@@ -548,19 +580,19 @@ export default class imageAutoUploadPlugin extends Plugin {
             hasChange = true;
           } else {
             // 没有映射，加入待上传列表
-             if (isAssetTypeAnImage(file.path)) {
-                imageList.push({
-                  path: normalizePath(file.path),
-                  name: match.name,
-                  source: match.source,
-                  file: file,
-                });
-             }
+            if (isAssetTypeAnImage(file.path)) {
+              imageList.push({
+                path: normalizePath(file.path),
+                name: match.name,
+                source: match.source,
+                file: file,
+              });
+            }
           }
         }
       }
     }
-    
+
     if (hasChange) {
       this.helper.setValue(value);
     }
@@ -572,23 +604,23 @@ export default class imageAutoUploadPlugin extends Plugin {
           new Notice(t("Upload error"));
           return;
         }
-        
+
         let uploadUrlList = res.result;
         // 更新映射
         imageList.forEach((item, index) => {
-           if (item.file) {
-             this.imageStore.set(item.file.path, uploadUrlList[index]);
-           }
+          if (item.file) {
+            this.imageStore.set(item.file.path, uploadUrlList[index]);
+          }
         });
-        
+
         this.replaceImage(imageList, uploadUrlList);
       });
     } else {
-        if (hasChange) {
-             new Notice(t("Switch to remote URL successfully"));
-        } else {
-             new Notice(t("No local image found"));
-        }
+      if (hasChange) {
+        new Notice(t("Switch to remote URL successfully"));
+      } else {
+        new Notice(t("No local image found"));
+      }
     }
   }
 

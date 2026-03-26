@@ -77,4 +77,11 @@ export default {
   "No local URL found": "No local URL found",
   "Switch to remote URL successfully": "Switch to remote URL successfully",
   "No local image found": "No local image found",
+  "Replace links": "Replace links",
+  "Do you want to replace local image links with online links in the document?": "Do you want to replace local image links with online links in the document after uploading?",
+  "Upload complete": "Upload complete",
+  "Download complete": "Download complete",
+  "All": "All",
+  "Success": "Success",
+  "Failed": "Failed",
 };

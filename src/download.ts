@@ -57,9 +57,11 @@ export async function downloadAllImageFiles(plugin: imageAutoUploadPlugin) {
     }
   }
 
+  const internetImages = fileArray.filter(file => file.path.startsWith("http"));
+
   new Notice(
-    `all: ${fileArray.length}\nsuccess: ${imageArray.length}\nfailed: ${
-      fileArray.length - imageArray.length
+    `${t("Download complete")}\n${t("All")}: ${internetImages.length}\n${t("Success")}: ${imageArray.length}\n${t("Failed")}: ${
+      internetImages.length - imageArray.length
     }`
   );
 }

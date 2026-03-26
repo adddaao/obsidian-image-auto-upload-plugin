@@ -71,4 +71,11 @@ export default {
   "No local URL found": "未找到本地地址",
   "Switch to remote URL successfully": "切换线上地址成功",
   "No local image found": "未找到本地图片",
+  "Replace links": "替换链接",
+  "Do you want to replace local image links with online links in the document?": "是否在上传后修改文中的图片链接为线上？",
+  "Upload complete": "上传完成",
+  "Download complete": "下载完成",
+  "All": "总计",
+  "Success": "成功",
+  "Failed": "失败",
 };
